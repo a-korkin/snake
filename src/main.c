@@ -122,6 +122,7 @@ void update(state_t *state) {
     }
     float delta_time = (SDL_GetTicks() - last_frame_time) / 1000.0f;
     last_frame_time = SDL_GetTicks();
+    // fprintf(stdout, "delta_time: %f\n", delta_time);
 
     switch (state->snake->direction) {
         case UP: state->snake->velocity.y -= STEP * delta_time; break;
@@ -180,7 +181,6 @@ int main(void) {
         handle_input(state);
         update(state);
         draw(state);
-        SDL_Delay(20);
     }
     clear(state);
 
