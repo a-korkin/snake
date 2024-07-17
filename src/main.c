@@ -137,6 +137,21 @@ void handle_input(state_t *state) {
     }
 }
 
+void out_off_bound_check(state_t *state) {
+    if (state->snake->velocity.x + STEP <= 0) { 
+        state->snake->velocity.x = state->snake->position.x = SCREEN_W - STEP; 
+    }
+    if (state->snake->velocity.x > SCREEN_W) {
+        state->snake->velocity.x = state->snake->position.x = 0;
+    }
+    if (state->snake->velocity.y + STEP <= 0) { 
+        state->snake->velocity.y = state->snake->position.y = SCREEN_H - STEP; 
+    }
+    if (state->snake->velocity.y > SCREEN_H) {
+        state->snake->velocity.y = state->snake->position.y = 0;
+    }
+}
+
 void update_snake(state_t *state, float delta_time) {
     switch (state->snake->direction) {
         case UP: state->snake->velocity.y -= STEP * delta_time; break;
@@ -144,9 +159,7 @@ void update_snake(state_t *state, float delta_time) {
         case LEFT: state->snake->velocity.x -= STEP * delta_time; break;
         case RIGHT: state->snake->velocity.x += STEP * delta_time; break;
     }
-    if (state->snake->velocity.y + STEP <= 0) { 
-        state->snake->velocity.y = state->snake->position.y = SCREEN_H - STEP; 
-    }
+    out_off_bound_check(state);
     if ((int) state->snake->velocity.x % STEP == 0) {
         state->snake->position.x = state->snake->velocity.x;
     }
