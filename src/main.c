@@ -1,3 +1,5 @@
+#include <SDL2/SDL_keycode.h>
+#include <SDL2/SDL_timer.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -21,6 +23,7 @@ typedef enum {
 
 typedef struct {
     SDL_FRect position;
+    SDL_FPoint velocity;
     direction_t direction;
 } snake_t;
 
@@ -32,6 +35,12 @@ typedef struct {
     snake_t *snake;
 } state_t;
 
+void set_random_position(int *x, int *y) {
+    srand(time(NULL));
+    *x = (int) ((rand() % SCREEN_W) / (float) STEP) * STEP;
+    *y = (int) ((rand() % SCREEN_H) / (float) STEP) * STEP;
+}
+
 snake_t *create_snake(void) {
     snake_t *snake = (snake_t*) malloc(sizeof(snake_t));
     if (!snake) {
@@ -39,14 +48,17 @@ snake_t *create_snake(void) {
             "Couldn't allocate memory for snake: %s\n", SDL_GetError());
         exit(1);
     }
-    srand(time(NULL));
-    int x = (int) ((rand() % SCREEN_W) / (float) STEP);
-    int y = (int) ((rand() % SCREEN_H) / (float) STEP);
+    int x, y;
+    // set_random_position(&x, &y);
     snake->position = (SDL_FRect) { 
-        .x = x * STEP, 
-        .y = y * STEP, 
+        .x = 320, 
+        .y = SCREEN_H - STEP, 
         .w = STEP, 
         .h = STEP 
+    };
+    snake->velocity = (SDL_FPoint) { 
+        .x = snake->position.x, 
+        .y = snake->position.y 
     };
     snake->direction = UP;
     return snake;
@@ -94,10 +106,10 @@ void handle_input(state_t *state) {
     if (state->event.type == SDL_KEYDOWN) {
         switch (state->event.key.keysym.sym) {
             case SDLK_ESCAPE: state->running = false; break;
-            case SDLK_UP: fprintf(stdout, "up\n"); break;
-            case SDLK_DOWN: fprintf(stdout, "down\n"); break;
-            case SDLK_LEFT: fprintf(stdout, "left\n"); break;
-            case SDLK_RIGHT: fprintf(stdout, "right\n"); break;
+            case SDLK_UP: state->snake->direction = UP; break;
+            case SDLK_DOWN: state->snake->direction = DOWN; break;
+            case SDLK_LEFT: state->snake->direction = LEFT; break;
+            case SDLK_RIGHT: state->snake->direction = RIGHT; break;
             default: break;
         }
     }
@@ -112,10 +124,16 @@ void update(state_t *state) {
     last_frame_time = SDL_GetTicks();
 
     switch (state->snake->direction) {
-        case UP: state->snake->position.y -= STEP * delta_time; break;;
-        case DOWN: break;
-        case LEFT: break;
-        case RIGHT: break;
+        case UP: state->snake->velocity.y -= STEP * delta_time; break;
+        case DOWN: state->snake->velocity.y += STEP * delta_time; break;
+        case LEFT: state->snake->velocity.x -= STEP * delta_time; break;
+        case RIGHT: state->snake->velocity.x += STEP * delta_time; break;
+    }
+    if ((int) state->snake->velocity.x % STEP == 0) {
+        state->snake->position.x = state->snake->velocity.x;
+    }
+    if ((int) state->snake->velocity.y % STEP == 0) {
+        state->snake->position.y = state->snake->velocity.y;
     }
 }
 
@@ -137,6 +155,7 @@ void draw_grid(state_t *state) {
 
 void draw_snake(state_t *state) {
     SDL_SetRenderDrawColor(state->renderer, 0x00, 0xFF, 0x00, 0xFF);
+    SDL_RenderDrawRectF(state->renderer, &state->snake->position);
     SDL_RenderFillRectF(state->renderer, &state->snake->position);
 }
 
@@ -161,6 +180,7 @@ int main(void) {
         handle_input(state);
         update(state);
         draw(state);
+        SDL_Delay(20);
     }
     clear(state);
 
