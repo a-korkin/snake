@@ -7,9 +7,21 @@
 #define SCREEN_W 640
 #define SCREEN_H 480
 #define STEP 32
+#define FPS 60
+#define FRAME_TARGET_TIME (1000.f / FPS)
+
+int last_frame_time = 0;
+
+typedef enum {
+    UP,
+    DOWN,
+    LEFT, 
+    RIGHT,
+} direction_t;
 
 typedef struct {
     SDL_FRect position;
+    direction_t direction;
 } snake_t;
 
 typedef struct {
@@ -36,6 +48,7 @@ snake_t *create_snake(void) {
         .w = STEP, 
         .h = STEP 
     };
+    snake->direction = UP;
     return snake;
 }
 
@@ -69,6 +82,7 @@ state_t *init(void) {
     }
     state->running = true;
     state->snake = create_snake();
+    last_frame_time = SDL_GetTicks();
     return state;
 }
 
@@ -86,6 +100,22 @@ void handle_input(state_t *state) {
             case SDLK_RIGHT: fprintf(stdout, "right\n"); break;
             default: break;
         }
+    }
+}
+
+void update(state_t *state) {
+    int time_to_wait = FRAME_TARGET_TIME - (SDL_GetTicks() - last_frame_time);
+    if (time_to_wait > 0 && time_to_wait <= FRAME_TARGET_TIME) {
+        SDL_Delay(time_to_wait);
+    }
+    float delta_time = (SDL_GetTicks() - last_frame_time) / 1000.0f;
+    last_frame_time = SDL_GetTicks();
+
+    switch (state->snake->direction) {
+        case UP: state->snake->position.y -= STEP * delta_time; break;;
+        case DOWN: break;
+        case LEFT: break;
+        case RIGHT: break;
     }
 }
 
@@ -121,6 +151,7 @@ void clear(state_t *state) {
     SDL_DestroyRenderer(state->renderer);
     SDL_DestroyWindow(state->window);
     SDL_Quit();
+    free(state->snake);
     free(state);
 }
 
@@ -128,6 +159,7 @@ int main(void) {
     state_t *state = init();
     while (state->running) {
         handle_input(state);
+        update(state);
         draw(state);
     }
     clear(state);
