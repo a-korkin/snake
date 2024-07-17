@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <stdbool.h>
+#include <stdlib.h>
+#include <time.h>
 #include <SDL2/SDL.h>
 
 #define SCREEN_W 640
@@ -7,11 +9,35 @@
 #define STEP 32
 
 typedef struct {
+    SDL_FRect position;
+} snake_t;
+
+typedef struct {
     SDL_Window *window;
     SDL_Renderer *renderer;
     SDL_Event event;
     bool running;
+    snake_t *snake;
 } state_t;
+
+snake_t *create_snake(void) {
+    snake_t *snake = (snake_t*) malloc(sizeof(snake_t));
+    if (!snake) {
+        fprintf(stderr, 
+            "Couldn't allocate memory for snake: %s\n", SDL_GetError());
+        exit(1);
+    }
+    srand(time(NULL));
+    int x = (int) ((rand() % SCREEN_W) / (float) STEP);
+    int y = (int) ((rand() % SCREEN_H) / (float) STEP);
+    snake->position = (SDL_FRect) { 
+        .x = x * STEP, 
+        .y = y * STEP, 
+        .w = STEP, 
+        .h = STEP 
+    };
+    return snake;
+}
 
 state_t *init(void) {
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
@@ -42,6 +68,8 @@ state_t *init(void) {
         exit(1);
     }
     state->running = true;
+    state->snake = create_snake();
+    return state;
 }
 
 void handle_input(state_t *state) {
@@ -66,8 +94,26 @@ void draw_background(state_t *state) {
     SDL_RenderClear(state->renderer);
 }
 
+void draw_grid(state_t *state) {
+    SDL_SetRenderDrawColor(state->renderer, 0x00, 0x00, 0x00, 0xFF);
+    int i;
+    for (i = STEP; i < SCREEN_W; i += STEP) {
+        SDL_RenderDrawLine(state->renderer, i, 0, i, SCREEN_H);
+    }
+    for (i = STEP; i < SCREEN_H; i += STEP) {
+        SDL_RenderDrawLine(state->renderer, 0, i, SCREEN_W, i);
+    }
+}
+
+void draw_snake(state_t *state) {
+    SDL_SetRenderDrawColor(state->renderer, 0x00, 0xFF, 0x00, 0xFF);
+    SDL_RenderFillRectF(state->renderer, &state->snake->position);
+}
+
 void draw(state_t *state) {
     draw_background(state);
+    draw_grid(state);
+    draw_snake(state);
     SDL_RenderPresent(state->renderer);
 }
 
