@@ -196,12 +196,12 @@ void update(state_t *state) {
 }
 
 void draw_background(state_t *state) {
-    SDL_SetRenderDrawColor(state->renderer, 0xFF, 0xFF, 0xFF, 0xFF);
+    SDL_SetRenderDrawColor(state->renderer, 54, 69, 79, 0xFF);
     SDL_RenderClear(state->renderer);
 }
 
 void draw_grid(state_t *state) {
-    SDL_SetRenderDrawColor(state->renderer, 0x00, 0x00, 0x00, 0xFF);
+    SDL_SetRenderDrawColor(state->renderer, 137, 148, 153, 0xFF);
     int i;
     for (i = STEP; i < SCREEN_W; i += STEP) {
         SDL_RenderDrawLine(state->renderer, i, 0, i, SCREEN_H);
@@ -212,13 +212,13 @@ void draw_grid(state_t *state) {
 }
 
 void draw_snake(state_t *state) {
-    SDL_SetRenderDrawColor(state->renderer, 0x00, 0xFF, 0x00, 0xFF);
+    SDL_SetRenderDrawColor(state->renderer, 80, 200, 120, 0xFF);
     SDL_RenderDrawRectF(state->renderer, &state->snake->position);
     SDL_RenderFillRectF(state->renderer, &state->snake->position);
 }
 
 void draw_apple(state_t *state) {
-    SDL_SetRenderDrawColor(state->renderer, 0xFF, 0x00, 0x00, 0xFF);
+    SDL_SetRenderDrawColor(state->renderer, 210, 43, 43, 0xFF);
     SDL_FRect rect = { 
         .x = state->apple->position.x, 
         .y = state->apple->position.y,
