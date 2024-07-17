@@ -1,4 +1,6 @@
 #include <SDL2/SDL_keycode.h>
+#include <SDL2/SDL_rect.h>
+#include <SDL2/SDL_render.h>
 #include <SDL2/SDL_timer.h>
 #include <stdio.h>
 #include <stdbool.h>
@@ -28,11 +30,16 @@ typedef struct {
 } snake_t;
 
 typedef struct {
+    SDL_FPoint position;
+} apple_t;
+
+typedef struct {
     SDL_Window *window;
     SDL_Renderer *renderer;
     SDL_Event event;
     bool running;
     snake_t *snake;
+    apple_t *apple;
 } state_t;
 
 void set_random_position(int *x, int *y) {
@@ -48,7 +55,7 @@ snake_t *create_snake(void) {
             "Couldn't allocate memory for snake: %s\n", SDL_GetError());
         exit(1);
     }
-    int x, y;
+    // int x, y;
     // set_random_position(&x, &y);
     snake->position = (SDL_FRect) { 
         .x = 320, 
@@ -62,6 +69,20 @@ snake_t *create_snake(void) {
     };
     snake->direction = UP;
     return snake;
+}
+
+apple_t *create_apple(void) {
+    apple_t *apple = (apple_t*) malloc(sizeof(apple_t));
+    if (!apple) {
+        fprintf(stderr, 
+            "Couldn't allocate memory for apple: %s", SDL_GetError());
+        exit(1);
+    }
+    int x, y;
+    set_random_position(&x, &y);
+    apple->position.x = x;
+    apple->position.y = y;
+    return apple;
 }
 
 state_t *init(void) {
@@ -94,6 +115,7 @@ state_t *init(void) {
     }
     state->running = true;
     state->snake = create_snake();
+    state->apple = create_apple();
     last_frame_time = SDL_GetTicks();
     return state;
 }
@@ -115,20 +137,15 @@ void handle_input(state_t *state) {
     }
 }
 
-void update(state_t *state) {
-    int time_to_wait = FRAME_TARGET_TIME - (SDL_GetTicks() - last_frame_time);
-    if (time_to_wait > 0 && time_to_wait <= FRAME_TARGET_TIME) {
-        SDL_Delay(time_to_wait);
-    }
-    float delta_time = (SDL_GetTicks() - last_frame_time) / 1000.0f;
-    last_frame_time = SDL_GetTicks();
-    // fprintf(stdout, "delta_time: %f\n", delta_time);
-
+void update_snake(state_t *state, float delta_time) {
     switch (state->snake->direction) {
         case UP: state->snake->velocity.y -= STEP * delta_time; break;
         case DOWN: state->snake->velocity.y += STEP * delta_time; break;
         case LEFT: state->snake->velocity.x -= STEP * delta_time; break;
         case RIGHT: state->snake->velocity.x += STEP * delta_time; break;
+    }
+    if (state->snake->velocity.y + STEP <= 0) { 
+        state->snake->velocity.y = state->snake->position.y = SCREEN_H - STEP; 
     }
     if ((int) state->snake->velocity.x % STEP == 0) {
         state->snake->position.x = state->snake->velocity.x;
@@ -136,6 +153,16 @@ void update(state_t *state) {
     if ((int) state->snake->velocity.y % STEP == 0) {
         state->snake->position.y = state->snake->velocity.y;
     }
+}
+
+void update(state_t *state) {
+    int time_to_wait = FRAME_TARGET_TIME - (SDL_GetTicks() - last_frame_time);
+    if (time_to_wait > 0 && time_to_wait <= FRAME_TARGET_TIME) {
+        SDL_Delay(time_to_wait);
+    }
+    float delta_time = (SDL_GetTicks() - last_frame_time) / 1000.0f;
+    last_frame_time = SDL_GetTicks();
+    update_snake(state, delta_time);
 }
 
 void draw_background(state_t *state) {
@@ -160,10 +187,23 @@ void draw_snake(state_t *state) {
     SDL_RenderFillRectF(state->renderer, &state->snake->position);
 }
 
+void draw_apple(state_t *state) {
+    SDL_SetRenderDrawColor(state->renderer, 0xFF, 0x00, 0x00, 0xFF);
+    SDL_FRect rect = { 
+        .x = state->apple->position.x, 
+        .y = state->apple->position.y,
+        .w = STEP,
+        .h = STEP,
+    };
+    SDL_RenderDrawRectF(state->renderer, &rect);
+    SDL_RenderFillRectF(state->renderer, &rect);
+}
+
 void draw(state_t *state) {
     draw_background(state);
     draw_grid(state);
     draw_snake(state);
+    draw_apple(state);
     SDL_RenderPresent(state->renderer);
 }
 
