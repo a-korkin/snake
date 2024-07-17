@@ -1,11 +1,11 @@
-#include <SDL2/SDL_keycode.h>
-#include <SDL2/SDL_rect.h>
-#include <SDL2/SDL_render.h>
-#include <SDL2/SDL_timer.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <time.h>
+#include <SDL2/SDL_keycode.h>
+#include <SDL2/SDL_rect.h>
+#include <SDL2/SDL_render.h>
+#include <SDL2/SDL_timer.h>
 #include <SDL2/SDL.h>
 
 #define SCREEN_W 640
@@ -40,6 +40,7 @@ typedef struct {
     bool running;
     snake_t *snake;
     apple_t *apple;
+    int score;
 } state_t;
 
 void set_random_position(int *x, int *y) {
@@ -55,8 +56,6 @@ snake_t *create_snake(void) {
             "Couldn't allocate memory for snake: %s\n", SDL_GetError());
         exit(1);
     }
-    // int x, y;
-    // set_random_position(&x, &y);
     snake->position = (SDL_FRect) { 
         .x = 320, 
         .y = SCREEN_H - STEP, 
@@ -152,6 +151,23 @@ void out_off_bound_check(state_t *state) {
     }
 }
 
+void hit(state_t *state) {
+    state->score++;
+
+    int x, y;
+    set_random_position(&x, &y);
+    state->apple->position.x = x;
+    state->apple->position.y = y;
+    fprintf(stdout, "score: %d\n", state->score);
+}
+
+void check_collision(state_t *state) {
+    if ((int) state->snake->position.x == (int) state->apple->position.x
+        && (int) state->snake->position.y == (int) state->apple->position.y) {
+        hit(state);
+    }
+}
+
 void update_snake(state_t *state, float delta_time) {
     switch (state->snake->direction) {
         case UP: state->snake->velocity.y -= STEP * delta_time; break;
@@ -166,6 +182,7 @@ void update_snake(state_t *state, float delta_time) {
     if ((int) state->snake->velocity.y % STEP == 0) {
         state->snake->position.y = state->snake->velocity.y;
     }
+    check_collision(state);
 }
 
 void update(state_t *state) {
@@ -225,6 +242,7 @@ void clear(state_t *state) {
     SDL_DestroyWindow(state->window);
     SDL_Quit();
     free(state->snake);
+    free(state->apple);
     free(state);
 }
 
