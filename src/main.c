@@ -1,4 +1,6 @@
 #include <SDL2/SDL_error.h>
+#include <SDL2/SDL_pixels.h>
+#include <SDL2/SDL_surface.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -8,6 +10,7 @@
 #include <SDL2/SDL_render.h>
 #include <SDL2/SDL_timer.h>
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_ttf.h>
 
 #define SCREEN_W 640
 #define SCREEN_H 480
@@ -48,6 +51,9 @@ typedef struct {
     snake_t *snake;
     apple_t *apple;
     int score;
+    TTF_Font *font;
+    SDL_Surface *text_surface;
+    SDL_Texture *text_texture;
 } state_t;
 
 void set_random_position(int *x, int *y) {
@@ -132,6 +138,16 @@ state_t *init(void) {
     state->apple = create_apple();
     state->score = 0;
     last_frame_time = SDL_GetTicks();
+    if (TTF_Init() < 0) {
+        fprintf(stderr, "Couldn't initialize TTF: %s\n", TTF_GetError());
+        exit(1);
+    }
+    state->font = TTF_OpenFont("assets/fonts/OpenSans-Regular.ttf", 12);
+    if (!state->font) {
+        fprintf(stderr, "Failed to load font: %s\n", TTF_GetError());
+        exit(1);
+    }
+
     return state;
 }
 
@@ -152,7 +168,7 @@ void handle_input(state_t *state) {
     }
 }
 
-void out_off_bound_check(state_t *state) {
+void out_off_bound(state_t *state) {
     if (state->snake->velocity.x + STEP <= 0) { 
         state->snake->velocity.x = state->snake->head->position.x = SCREEN_W - STEP; 
     }
@@ -200,10 +216,10 @@ void add_node(snake_t *snake) {
     node->position.y = y;
     node->position.w = STEP;
     node->position.h = STEP;
+    node->next = NULL;
 
     snake->tail->next = node;
     snake->tail = node;
-    snake->tail->next = NULL;
 }
 
 void hit(state_t *state) {
@@ -231,7 +247,7 @@ void update_snake(state_t *state, float delta_time) {
         case LEFT: state->snake->velocity.x -= STEP * delta_time; break;
         case RIGHT: state->snake->velocity.x += STEP * delta_time; break;
     }
-    out_off_bound_check(state);
+    out_off_bound(state);
     if ((int) state->snake->velocity.x % STEP == 0) {
         state->snake->head->position.x = state->snake->velocity.x;
     }
@@ -241,14 +257,25 @@ void update_snake(state_t *state, float delta_time) {
     node_t *current = state->snake->head;
     while (current->next) {
         switch (state->snake->direction) {
-            case UP: current->next->position.y = current->position.y + STEP; break;
-            case DOWN: current->next->position.y = current->position.y - STEP; break;
-            case LEFT: current->next->position.x = current->position.x + STEP; break;
-            case RIGHT: current->next->position.x = current->position.x - STEP; break;
+            case UP: 
+                current->next->position.x = current->position.x;
+                current->next->position.y = current->position.y + STEP; 
+                break;
+            case DOWN: 
+                current->next->position.x = current->position.x;
+                current->next->position.y = current->position.y - STEP; 
+                break;
+            case LEFT: 
+                current->next->position.x = current->position.x + STEP; 
+                current->next->position.y = current->position.y; 
+                break;
+            case RIGHT: 
+                current->next->position.x = current->position.x - STEP; 
+                current->next->position.y = current->position.y; 
+                break;
         }
         current = current->next;
     }
-
     check_collision(state);
 }
 
@@ -276,6 +303,22 @@ void draw_grid(state_t *state) {
     for (i = STEP; i < SCREEN_H; i += STEP) {
         SDL_RenderDrawLine(state->renderer, 0, i, SCREEN_W, i);
     }
+}
+
+void draw_score(state_t *state) {
+    SDL_Color white = {255, 255, 255};
+    char *text = (char *) malloc(sizeof(char) * 10);
+    sprintf(text, "score: %2d", state->score);
+    state->text_surface = TTF_RenderText_Solid(state->font, text, white);
+    state->text_texture = SDL_CreateTextureFromSurface(
+            state->renderer, state->text_surface);
+    SDL_Rect score_rect = {
+        .x = SCREEN_W / 2 - 50,
+        .y = 0,
+        .w = 100,
+        .h = 50,
+    };
+    SDL_RenderCopy(state->renderer, state->text_texture, NULL, &score_rect);
 }
 
 void draw_snake(state_t *state) {
@@ -310,14 +353,18 @@ void draw_apple(state_t *state) {
 void draw(state_t *state) {
     draw_background(state);
     draw_grid(state);
+    draw_score(state);
     draw_snake(state);
     draw_apple(state);
     SDL_RenderPresent(state->renderer);
 }
 
 void clear(state_t *state) {
+    // SDL_FreeSurface(state->text_surface);
+    // SDL_DestroyTexture(state->text_texture);
     SDL_DestroyRenderer(state->renderer);
     SDL_DestroyWindow(state->window);
+    TTF_Quit();
     SDL_Quit();
     free(state->snake);
     free(state->apple);
