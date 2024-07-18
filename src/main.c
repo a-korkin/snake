@@ -30,7 +30,6 @@ typedef struct node {
 } node_t;
 
 typedef struct {
-    // SDL_FRect position;
     node_t *head;
     node_t *tail;
     SDL_FPoint velocity;
@@ -175,6 +174,9 @@ void add_node(snake_t *snake) {
             "Couldn't allocate memory for tail: %s\n", SDL_GetError());
         exit(1);
     }
+    fprintf(stdout, "h_x: %.2f, h_y: %.2f, t_x: %.2f, t_y: %.2f\n", 
+            snake->head->position.x, snake->head->position.y,
+            snake->tail->position.x, snake->tail->position.y);
     float x, y; 
     switch (snake->direction) {
         case UP: 
@@ -194,15 +196,14 @@ void add_node(snake_t *snake) {
             y = snake->tail->position.y;
             break; 
     }
+    node->position.x = x;
+    node->position.y = y;
+    node->position.w = STEP;
+    node->position.h = STEP;
 
-    node->position = (SDL_FRect) {
-        .x = x,
-        .y = y,
-        .w = STEP,
-        .h = STEP,
-    };
     snake->tail->next = node;
     snake->tail = node;
+    snake->tail->next = NULL;
 }
 
 void hit(state_t *state) {
@@ -279,13 +280,17 @@ void draw_grid(state_t *state) {
 
 void draw_snake(state_t *state) {
     SDL_SetRenderDrawColor(state->renderer, 80, 200, 120, 0xFF);
-    // SDL_RenderDrawRectF(state->renderer, &state->snake->head->position);
-    // SDL_RenderFillRectF(state->renderer, &state->snake->head->position);
 
     node_t *n = state->snake->head;
     while (n) {
-        SDL_RenderDrawRectF(state->renderer, &n->position);
-        SDL_RenderFillRectF(state->renderer, &n->position);
+        if (SDL_RenderDrawRectF(state->renderer, &n->position) < 0) {
+            fprintf(stderr, "Couldn't draw node: %s\n", SDL_GetError());
+            exit(1);
+        }
+        if (SDL_RenderFillRectF(state->renderer, &n->position) < 0) {
+            fprintf(stderr, "Couldn't fill rect: %s\n", SDL_GetError());
+            exit(1);
+        }
         n = n->next;
     }
 }
