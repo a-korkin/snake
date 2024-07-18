@@ -1,3 +1,4 @@
+#include <SDL2/SDL_error.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -23,8 +24,15 @@ typedef enum {
     RIGHT,
 } direction_t;
 
-typedef struct {
+typedef struct node {
     SDL_FRect position;
+    struct node *next;
+} node_t;
+
+typedef struct {
+    // SDL_FRect position;
+    node_t *head;
+    node_t *tail;
     SDL_FPoint velocity;
     direction_t direction;
 } snake_t;
@@ -50,21 +58,29 @@ void set_random_position(int *x, int *y) {
 }
 
 snake_t *create_snake(void) {
-    snake_t *snake = (snake_t*) malloc(sizeof(snake_t));
+    snake_t *snake = (snake_t *) malloc(sizeof(snake_t));
     if (!snake) {
         fprintf(stderr, 
             "Couldn't allocate memory for snake: %s\n", SDL_GetError());
         exit(1);
     }
-    snake->position = (SDL_FRect) { 
+    node_t *head = (node_t *) malloc(sizeof(node_t));
+    if (!head) {
+        fprintf(stderr, 
+            "Couldn't allocate memory for head: %s\n", SDL_GetError());
+        exit(1);
+    }
+    head->position = (SDL_FRect) { 
         .x = 320, 
         .y = SCREEN_H - STEP, 
         .w = STEP, 
         .h = STEP 
     };
+    snake->head = head;
+    snake->tail = head;
     snake->velocity = (SDL_FPoint) { 
-        .x = snake->position.x, 
-        .y = snake->position.y 
+        .x = snake->head->position.x, 
+        .y = snake->head->position.y 
     };
     snake->direction = UP;
     return snake;
@@ -115,6 +131,7 @@ state_t *init(void) {
     state->running = true;
     state->snake = create_snake();
     state->apple = create_apple();
+    state->score = 0;
     last_frame_time = SDL_GetTicks();
     return state;
 }
@@ -138,21 +155,59 @@ void handle_input(state_t *state) {
 
 void out_off_bound_check(state_t *state) {
     if (state->snake->velocity.x + STEP <= 0) { 
-        state->snake->velocity.x = state->snake->position.x = SCREEN_W - STEP; 
+        state->snake->velocity.x = state->snake->head->position.x = SCREEN_W - STEP; 
     }
     if (state->snake->velocity.x > SCREEN_W) {
-        state->snake->velocity.x = state->snake->position.x = 0;
+        state->snake->velocity.x = state->snake->head->position.x = 0;
     }
     if (state->snake->velocity.y + STEP <= 0) { 
-        state->snake->velocity.y = state->snake->position.y = SCREEN_H - STEP; 
+        state->snake->velocity.y = state->snake->head->position.y = SCREEN_H - STEP; 
     }
     if (state->snake->velocity.y > SCREEN_H) {
-        state->snake->velocity.y = state->snake->position.y = 0;
+        state->snake->velocity.y = state->snake->head->position.y = 0;
     }
+}
+
+void add_node(snake_t *snake) {
+    node_t *node = (node_t *) malloc(sizeof(node_t));
+    if (!node) {
+        fprintf(stderr, 
+            "Couldn't allocate memory for tail: %s\n", SDL_GetError());
+        exit(1);
+    }
+    float x, y; 
+    switch (snake->direction) {
+        case UP: 
+            x = snake->tail->position.x;
+            y = snake->tail->position.y + STEP;
+            break;
+        case DOWN:
+            x = snake->tail->position.x;
+            y = snake->tail->position.y - STEP;
+            break; 
+        case LEFT:
+            x = snake->tail->position.x + STEP;
+            y = snake->tail->position.y;
+            break; 
+        case RIGHT:
+            x = snake->tail->position.x - STEP;
+            y = snake->tail->position.y;
+            break; 
+    }
+
+    node->position = (SDL_FRect) {
+        .x = x,
+        .y = y,
+        .w = STEP,
+        .h = STEP,
+    };
+    snake->tail->next = node;
+    snake->tail = node;
 }
 
 void hit(state_t *state) {
     state->score++;
+    add_node(state->snake);
 
     int x, y;
     set_random_position(&x, &y);
@@ -162,8 +217,8 @@ void hit(state_t *state) {
 }
 
 void check_collision(state_t *state) {
-    if ((int) state->snake->position.x == (int) state->apple->position.x
-        && (int) state->snake->position.y == (int) state->apple->position.y) {
+    if ((int) state->snake->head->position.x == (int) state->apple->position.x
+        && (int) state->snake->head->position.y == (int) state->apple->position.y) {
         hit(state);
     }
 }
@@ -177,11 +232,22 @@ void update_snake(state_t *state, float delta_time) {
     }
     out_off_bound_check(state);
     if ((int) state->snake->velocity.x % STEP == 0) {
-        state->snake->position.x = state->snake->velocity.x;
+        state->snake->head->position.x = state->snake->velocity.x;
     }
     if ((int) state->snake->velocity.y % STEP == 0) {
-        state->snake->position.y = state->snake->velocity.y;
+        state->snake->head->position.y = state->snake->velocity.y;
     }
+    node_t *current = state->snake->head;
+    while (current->next) {
+        switch (state->snake->direction) {
+            case UP: current->next->position.y = current->position.y + STEP; break;
+            case DOWN: current->next->position.y = current->position.y - STEP; break;
+            case LEFT: current->next->position.x = current->position.x + STEP; break;
+            case RIGHT: current->next->position.x = current->position.x - STEP; break;
+        }
+        current = current->next;
+    }
+
     check_collision(state);
 }
 
@@ -213,8 +279,15 @@ void draw_grid(state_t *state) {
 
 void draw_snake(state_t *state) {
     SDL_SetRenderDrawColor(state->renderer, 80, 200, 120, 0xFF);
-    SDL_RenderDrawRectF(state->renderer, &state->snake->position);
-    SDL_RenderFillRectF(state->renderer, &state->snake->position);
+    // SDL_RenderDrawRectF(state->renderer, &state->snake->head->position);
+    // SDL_RenderFillRectF(state->renderer, &state->snake->head->position);
+
+    node_t *n = state->snake->head;
+    while (n) {
+        SDL_RenderDrawRectF(state->renderer, &n->position);
+        SDL_RenderFillRectF(state->renderer, &n->position);
+        n = n->next;
+    }
 }
 
 void draw_apple(state_t *state) {
